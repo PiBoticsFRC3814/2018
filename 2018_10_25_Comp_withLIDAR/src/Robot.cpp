@@ -55,6 +55,7 @@ public:
 	Joystick* driveJoy = new Joystick(0);
 	Joystick* buttonJoy = new Joystick(1);
 	Joystick* buttonPad = new Joystick(2);
+	Joystick* buttonJoy2 = new Joystick(4);
 	XboxController* driveCont = new XboxController(3);
 	XboxController* buttonCont = new XboxController(4);
 
