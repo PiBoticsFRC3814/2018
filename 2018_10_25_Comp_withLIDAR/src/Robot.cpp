@@ -6,7 +6,7 @@
 /*----------------------------------------------------------------------------*/
 
 
-#include <Commands/Command.h>
+#include "Commands/Command.h"
 #include <Commands/Scheduler.h>
 #include <LiveWindow/LiveWindow.h>
 #include <SmartDashboard/SendableChooser.h>
@@ -54,7 +54,6 @@ public:
 
 	Joystick* driveJoy = new Joystick(0);
 	Joystick* buttonJoy = new Joystick(1);
-	Joystick* buttonJoy2 = new Joystick(4);
 	Joystick* buttonPad = new Joystick(2);
 	XboxController* driveCont = new XboxController(3);
 	XboxController* buttonCont = new XboxController(4);
@@ -83,6 +82,7 @@ public:
 	double cTime = 0.0; //reset pin on clime timer
 	double T1 = 0.0; // timer variables
 	double T2 = 0.0;
+
 	bool climbing = false;
 	bool datafail = false;
 	bool elevatorUp = false;
@@ -95,6 +95,7 @@ public:
 	bool firstRotation = false;
 	bool secondRotation = false;
 	bool thirdRotation = false;
+	bool fourthDistance = false;
 	double gyroAdjust = 0.0;
 
 	double distance1 = 50.0; //distance from starting wall to scale center
@@ -220,6 +221,7 @@ public:
 		firstRotation = false;
 		secondRotation = false;
 		thirdRotation = false;
+		fourthDistance = false;
 		timer->Reset();
 		timer->Start();
 		T1 = timer->Get();
@@ -337,6 +339,10 @@ public:
 		return distance_in;
 	}
 
+	void DriveDistance(double wantedDistance){
+
+	}
+
 	void AutonomousPeriodic() override {
 		frc::Scheduler::GetInstance()->Run();
 
@@ -344,10 +350,10 @@ public:
 		frc::SmartDashboard::PutNumber("FMSside", FMSselector);
 		robotDistance = LIDARValue();
 
-			if (DSselector == 1)
+			if (DSselector == 1) // cross auto line ONLY
 			{
 				DriverStation::ReportError("drive forward");
-				if (timer->Get() < 3.0) //was 4 now 3
+				if (timer->Get() < 3.0) // drive forward for 3 seconds then stop
 				{
 					piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ());
 				}
@@ -356,12 +362,12 @@ public:
 					piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ());
 				}
 			}
-			if (DSselector == 3) // middle code
+			if (DSselector == 3) // robot starts in middle code
 			{
 				DriverStation::ReportError("Driving Forward and raising elevator");
 				if (timer->Get() <= 1.00) //the timer for elevator
 				{
-					elev->Execute(-1.0); // elevator at full speed
+					elev->Execute(-1.0); // elevator at full speed for 1 second
 				}
 				else
 				{
@@ -376,8 +382,7 @@ public:
 					piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ()); // stopping
 					firstDirection = true;
 				}
-				//****************************THIS CODE WORKS********************************************************    THIS CODE WORKS
-				if ((FMSselector == 1 || FMSselector == 3) && firstDirection) // right code
+				if ((FMSselector == 1 || FMSselector == 3) && firstDirection) // robot going for switch on right
 				{
 
 					if (timer->Get() <= 2.9 && timer->Get() >= 1.1) // 1.5 seconds going right
@@ -397,12 +402,11 @@ public:
 					if(timer->Get() >= 6.25)
 							{
 								piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ()); // stopping
-								grabber->Execute(solenoidFire[1]);
+								grabber->Execute(solenoidFire[1]); //place cube in switch
 
 							}
-
-				}//******************************************************************************************     THIS CODE WORKS
-				else if ((FMSselector == 2 || FMSselector == 4) && firstDirection) // left code
+				}
+				else if ((FMSselector == 2 || FMSselector == 4) && firstDirection) // robot going for switch on left
 				{
 
 						if (timer->Get() <= 2.7 && timer->Get() >= 1.1) // 1.5 seconds going left
@@ -422,55 +426,186 @@ public:
 					if(timer->Get() >= 6.15)
 						{
 							piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ()); // stopping
-							grabber->Execute(solenoidFire[1]);
-
+							grabber->Execute(solenoidFire[1]); //place cube oin switch
 						}
 				}
 			}
-			else if (DSselector == 2) // left auto
+			else if (DSselector == 2) // left auto (robot on left)
 				{
-					if (FMSselector == 1 || 4)
+					if (FMSselector == 1 || 4)  // left side going for scale on left side
 					{
 						DriverStation::ReportError("Driving Forward to LIDAR distance");
-						if (robotDistance <= (distance1 - distError)
-							&& !firstDirection){
-							piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ()); // going forward
+						if (robotDistance <= (distance1 - distError) && !firstDirection){ // go forward to specified distance
+							piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ());
 						}
-						else if (!firstDirection && robotDistance > (distance1 - distError)){
+						else if (!firstDirection && robotDistance > (distance1 - distError)){ // made it to first distance
 							firstDirection = true;
-							piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ()); // stop
+							piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ());
 						}
-						if (firstDirection && !firstRotation){
+						if (firstDirection && !firstRotation){ // rotate to face the scale
 							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
 							elev->Execute(-1.0);
 							if (gyro->GetAngleZ() <= -90.0){
 								firstRotation = true;
 							}
 						}
-						if (firstDirection && firstRotation && robotDistance <= distance2){
+						if (firstDirection && firstRotation && !secondRotation && robotDistance <= distance2){ // move forward to get close to scale
 							piboticsDrive->Execute(0.0, 0.25, GyroAdjust(-90.0), gyro->GetAngleZ());
 						}
 						else if (!secondDirection && robotDistance > distance2){
 							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
 							secondDirection = true;
 						}
-						if (secondDirection){
+						if (secondDirection){ // place cube
 							grabber->Execute(solenoidFire[1]);
 						}
-
+					}
+					if (FMSselector == 2 || 3)  // left side going for scale on right side
+					{
+						DriverStation::ReportError("Driving Forward to LIDAR distance");
+						if (robotDistance <= (distance3 - distError) && !firstDirection){ //move forward to area between switch and scale
+							piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ()); // going forward
+						}
+						else if (!firstDirection && robotDistance > (distance3 - distError)){
+							firstDirection = true;
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ()); // stop
+						}
+						if (firstDirection && !firstRotation){ //rotate robot
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
+							if (gyro->GetAngleZ() <= -90.0){
+								firstRotation = true;
+							}
+						}
+						if (firstDirection && firstRotation && !secondRotation && robotDistance <= distance4){ // move to right side of field
+							piboticsDrive->Execute(0.0, 0.50, GyroAdjust(-90.0), gyro->GetAngleZ());
+						}
+						else if (!secondDirection && robotDistance > distance4){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
+							secondDirection = true;
+						}
+						if (secondDirection && !secondRotation){ //rotate robot to forward face again
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ());
+							if (gyro->GetAngleZ() >= -0.1 && gyro->GetAngleZ() <= 0.1){
+								firstRotation = true;
+							}
+						}
+						if (secondDirection && secondRotation && robotDistance <= distance1){  // move remaining distance to line up with scale
+							piboticsDrive->Execute(0.0, 0.50, GyroAdjust(0.0), gyro->GetAngleZ());
+							//elev->Execute(-1.0);
+						}
+						else if (secondDirection && secondRotation && robotDistance > distance1){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ());
+							thirdDirection = true;
+						}
+						if (thirdDirection && !thirdRotation){ // rotate to face scale
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							elev->Execute(-1.0);
+							if (gyro->GetAngleZ() >= 90.0){
+								thirdRotation = true;
+							}
+						}
+						if (thirdDirection && thirdRotation && robotDistance <= distance2){ //move towards the scale
+							piboticsDrive->Execute(0.0, 0.25, GyroAdjust(90.0), gyro->GetAngleZ());
+						}
+						else if (thirdDirection && thirdRotation && robotDistance > distance2){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							fourthDistance = true;
+						}
+						if (fourthDistance){ // place the cube
+							grabber->Execute(solenoidFire[1]);
+						}
 					}
 				}
-			else if (DSselector == 4)//right auto
+			else if (DSselector == 4)//right side start
 				{
-
+					if (FMSselector == 2 || 3)  // right side going for scale on right side
+					{
+						DriverStation::ReportError("Driving Forward to LIDAR distance");
+						if (robotDistance <= (distance1 - distError) && !firstDirection){ // go forward to scale
+							piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ());
+						}
+						else if (!firstDirection && robotDistance > (distance1 - distError)){
+							firstDirection = true;
+							piboticsDrive->Execute(0.0, 0.0, 0.0, gyro->GetAngleZ()); // stop
+						}
+						if (firstDirection && !firstRotation){ //rotate to face the scale
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							elev->Execute(-1.0);
+							if (gyro->GetAngleZ() >= 90.0){
+								firstRotation = true;
+							}
+						}
+						if (firstDirection && firstRotation && !secondRotation && robotDistance <= distance2){ // move closer to scale
+							piboticsDrive->Execute(0.0, 0.25, GyroAdjust(90.0), gyro->GetAngleZ());
+						}
+						else if (!secondDirection && robotDistance > distance2){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							secondDirection = true;
+						}
+						if (secondDirection){ // place cube
+							grabber->Execute(solenoidFire[1]);
+						}
+					}
+					if (FMSselector == 1 || 4)  // right side going for scale on left side
+					{
+						DriverStation::ReportError("Driving Forward to LIDAR distance");
+						if (robotDistance <= (distance3 - distError) && !firstDirection){ // forward to between switch and scale
+							piboticsDrive->Execute(0.0, 0.5, GyroAdjust(0.0), gyro->GetAngleZ());
+						}
+						else if (!firstDirection && robotDistance > (distance3 - distError)){
+							firstDirection = true;
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ());
+						}
+						if (firstDirection && !firstRotation){ //rotate robot
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							if (gyro->GetAngleZ() >= 90.0){
+								firstRotation = true;
+							}
+						}
+						if (firstDirection && firstRotation && !secondRotation && robotDistance <= distance4){ // drive to left side of field
+							piboticsDrive->Execute(0.0, 0.50, GyroAdjust(90.0), gyro->GetAngleZ());
+						}
+						else if (!secondDirection && robotDistance > distance4){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(90.0), gyro->GetAngleZ());
+							secondDirection = true;
+						}
+						if (secondDirection && !secondRotation){ //rotate back to forward face
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ());
+							if (gyro->GetAngleZ() >= -0.1 && gyro->GetAngleZ() <= 0.1){
+								firstRotation = true;
+							}
+						}
+						if (secondDirection && secondRotation && robotDistance <= distance1){ // move forward to scale position
+							piboticsDrive->Execute(0.0, 0.50, GyroAdjust(0.0), gyro->GetAngleZ());
+							//elev->Execute(-1.0);
+						}
+						else if (secondDirection && secondRotation && robotDistance > distance1){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(0.0), gyro->GetAngleZ());
+							thirdDirection = true;
+						}
+						if (thirdDirection && !thirdRotation){ // rotate to face scale
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
+							elev->Execute(-1.0);
+							if (gyro->GetAngleZ() <= -90.0){
+								thirdRotation = true;
+							}
+						}
+						if (thirdDirection && thirdRotation && robotDistance <= distance2){ // move towards scale
+							piboticsDrive->Execute(0.0, 0.25, GyroAdjust(-90.0), gyro->GetAngleZ());
+						}
+						else if (thirdDirection && thirdRotation && robotDistance > distance2){
+							piboticsDrive->Execute(0.0, 0.0, GyroAdjust(-90.0), gyro->GetAngleZ());
+							fourthDistance = true;
+						}
+						if (fourthDistance){ // place cube
+							grabber->Execute(solenoidFire[1]);
+						}
+					}
 				}
-
 				else
 				{
 					DriverStation::ReportError("No FMS Question Field Staff");
 				}
-
-
 			}
 
 	void TeleopInit() override {
